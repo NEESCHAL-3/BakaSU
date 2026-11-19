@@ -172,10 +172,10 @@ static __nocfi void ksu_security_compute_av_user(struct policydb *policydb, stru
 
 // remove static in susfs
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0) || defined(KSU_COMPAT_HAS_SELINUX_POLICY_STRUCT)
-static int security_context_to_sid_with_policy(struct selinux_policy *policy, const char *scontext, u32 scontext_len,
+static int ksu_security_context_to_sid_with_policy(struct selinux_policy *policy, const char *scontext, u32 scontext_len,
                                                u32 *sid, u32 def_sid, gfp_t gfp_flags, u32 *orig_sid_p, int *orig_rc_p);
 
-static int security_sid_to_context_with_policy(struct selinux_policy *policy, u32 sid, char **scontext,
+int security_sid_to_context_with_policy(struct selinux_policy *policy, u32 sid, char **scontext,
                                                u32 *scontext_len)
 {
     struct policydb *policydb;
@@ -189,7 +189,7 @@ static int security_sid_to_context_with_policy(struct selinux_policy *policy, u3
     return ksu_security_sid_to_context(policydb, sidtab, sid, scontext, scontext_len);
 }
 
-static void security_compute_av_user_with_policy(struct selinux_policy *policy, u32 ssid, u32 tsid, u16 tclass,
+void security_compute_av_user_with_policy(struct selinux_policy *policy, u32 ssid, u32 tsid, u16 tclass,
                                                  struct av_decision *avd)
 {
     struct policydb *policydb;
@@ -202,6 +202,25 @@ static void security_compute_av_user_with_policy(struct selinux_policy *policy, 
     sidtab = policy->sidtab;
 
     ksu_security_compute_av_user(policydb, sidtab, ssid, tsid, tclass, avd);
+}
+
+/*
+ * EVONIX: kernel-side SUSFS six-argument SELinux interface.
+ *
+ * BakaSU's internal implementation additionally accepts two optional
+ * output pointers. Preserve that implementation and adapt the API.
+ */
+int security_context_to_sid_with_policy(
+    struct selinux_policy *policy,
+    const char *scontext,
+    u32 scontext_len,
+    u32 *sid,
+    u32 def_sid,
+    gfp_t gfp_flags)
+{
+    return ksu_security_context_to_sid_with_policy(
+        policy, scontext, scontext_len,
+        sid, def_sid, gfp_flags, NULL, NULL);
 }
 #endif
 
@@ -256,7 +275,7 @@ __maybe_static ssize_t my_write_context(struct file *file, char *buf, size_t siz
         goto out;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0) || defined(KSU_COMPAT_HAS_SELINUX_POLICY_STRUCT)
-    length = security_context_to_sid_with_policy(backup_sepolicy, buf, size, &sid, SECSID_NULL, GFP_KERNEL, NULL, NULL);
+    length = ksu_security_context_to_sid_with_policy(backup_sepolicy, buf, size, &sid, SECSID_NULL, GFP_KERNEL, NULL, NULL);
     if (length) {
         goto out;
     }
@@ -341,13 +360,13 @@ __maybe_static ssize_t my_write_access(struct file *file, char *buf, size_t size
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0) || defined(KSU_COMPAT_HAS_SELINUX_POLICY_STRUCT)
     length =
-        security_context_to_sid_with_policy(backup_sepolicy, scon, sconlen, &ssid, SECSID_NULL, GFP_KERNEL, NULL, NULL);
+        ksu_security_context_to_sid_with_policy(backup_sepolicy, scon, sconlen, &ssid, SECSID_NULL, GFP_KERNEL, NULL, NULL);
     if (length) {
         goto out;
     }
 
     length =
-        security_context_to_sid_with_policy(backup_sepolicy, tcon, tconlen, &tsid, SECSID_NULL, GFP_KERNEL, NULL, NULL);
+        ksu_security_context_to_sid_with_policy(backup_sepolicy, tcon, tconlen, &tsid, SECSID_NULL, GFP_KERNEL, NULL, NULL);
     if (length) {
         goto out;
     }
@@ -489,7 +508,7 @@ int __nocfi ksu_handle_selinux_setprocattr(struct task_struct *p, char *name, vo
             size--;
         }
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0) || defined(KSU_COMPAT_HAS_SELINUX_POLICY_STRUCT)
-        error2 = security_context_to_sid_with_policy(backup_sepolicy, value, size, &tmp_sid, SECSID_NULL, GFP_KERNEL,
+        error2 = ksu_security_context_to_sid_with_policy(backup_sepolicy, value, size, &tmp_sid, SECSID_NULL, GFP_KERNEL,
                                                      &sid, &error);
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0) || defined(KSU_COMPAT_SIDTAB_AS_REFERENCE)) &&                    \
     defined(KSU_COMPAT_USE_SELINUX_STATE)
@@ -1225,7 +1244,7 @@ static inline void ksu_unlock_sepolicy_legacy(void)
 
 // remove static in susfs
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0) || defined(KSU_COMPAT_HAS_SELINUX_POLICY_STRUCT)
-__maybe_static int security_context_to_sid_with_policy(struct selinux_policy *policy, const char *scontext,
+static int ksu_security_context_to_sid_with_policy(struct selinux_policy *policy, const char *scontext,
                                                        u32 scontext_len, u32 *sid, u32 def_sid, gfp_t gfp_flags,
                                                        u32 *orig_sid_p, int *orig_rc_p)
 #else
