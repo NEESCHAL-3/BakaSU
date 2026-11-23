@@ -205,10 +205,10 @@ void security_compute_av_user_with_policy(struct selinux_policy *policy, u32 ssi
 }
 
 /*
- * EVONIX: kernel-side SUSFS six-argument SELinux interface.
+ * EVONIX: kernel-side SUSFS eight-argument SELinux interface.
  *
  * BakaSU's internal implementation additionally accepts two optional
- * output pointers. Preserve that implementation and adapt the API.
+ * output pointers. Preserve that implementation and forward all arguments.
  */
 int security_context_to_sid_with_policy(
     struct selinux_policy *policy,
@@ -216,11 +216,13 @@ int security_context_to_sid_with_policy(
     u32 scontext_len,
     u32 *sid,
     u32 def_sid,
-    gfp_t gfp_flags)
+    gfp_t gfp_flags,
+    u32 *orig_sid_p,
+    int *orig_rc_p)
 {
     return ksu_security_context_to_sid_with_policy(
         policy, scontext, scontext_len,
-        sid, def_sid, gfp_flags, NULL, NULL);
+        sid, def_sid, gfp_flags, orig_sid_p, orig_rc_p);
 }
 #endif
 
